@@ -24,6 +24,7 @@ except Exception:
     ERRORS = (openai.RateLimitError,)
     OpenAIObject = dict
 
+CLIENT = None
 
 def backoff_hdlr(details):
     """Handler from https://pypi.org/project/backoff/"""
@@ -73,19 +74,21 @@ class GPT3(LM):
         )
         self.model_type = model_type if model_type else default_model_type
 
-        if api_key:
-            openai.api_key = api_key
+        # if api_key:
+        #     openai.api_key = api_key
         api_base = base_url or api_base
-        if api_base:
-            if OPENAI_LEGACY:
-                openai.api_base = api_base
-            else:
-                openai.base_url = api_base
+        # if api_base:
+        #     if OPENAI_LEGACY:
+        #         openai.api_base = api_base
+        #     else:
+        #         openai.base_url = api_base
+        global CLIENT
+        CLIENT = openai.OpenAI(api_key=api_key, base_url=api_base)
 
         self.kwargs = {
             "temperature": 0.0,
             "max_tokens": 150,
-            "top_p": 1,
+            "top_p": 0.9,
             "frequency_penalty": 0,
             "presence_penalty": 0,
             "n": 1,
@@ -176,8 +179,10 @@ class GPT3(LM):
         #         kwargs = {**kwargs}
         #     else:
         #         kwargs = {**kwargs, "logprobs": 5}
-
+        logging.info(f"Prompt: {prompt}")
         response = self.request(prompt, **kwargs)
+        logging.info(f"Response: {response}")
+
 
         self.log_usage(response)
         choices = response["choices"]
@@ -242,7 +247,8 @@ def _cached_gpt3_turbo_request_v2_wrapped(**kwargs) -> OpenAIObject:
 
 @CacheMemory.cache
 def v1_cached_gpt3_request_v2(**kwargs):
-    return openai.completions.create(**kwargs)
+    # return openai.completions.create(**kwargs)
+    return CLIENT.completions.create(**kwargs)
 
 
 @functools.lru_cache(maxsize=None if cache_turn_on else 0)
@@ -255,7 +261,8 @@ def v1_cached_gpt3_request_v2_wrapped(**kwargs):
 def v1_cached_gpt3_turbo_request_v2(**kwargs):
     if "stringify_request" in kwargs:
         kwargs = json.loads(kwargs["stringify_request"])
-    return openai.chat.completions.create(**kwargs)
+    # return openai.chat.completions.create(**kwargs)
+    return CLIENT.chat.completions.create(**kwargs)
 
 
 @functools.lru_cache(maxsize=None if cache_turn_on else 0)
